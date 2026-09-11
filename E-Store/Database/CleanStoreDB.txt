@@ -1,0 +1,133 @@
+﻿CREATE DATABASE CleanStoreDb;
+GO
+USE CleanStoreDb;
+GO
+
+-- =============================================================
+-- BƯỚC 1: TẠO CÁC BẢNG (DÙNG INT IDENTITY(1,1))
+-- =============================================================
+
+-- 1. Bảng Categories
+CREATE TABLE Categories (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Name NVARCHAR(100) NOT NULL,
+    Description NVARCHAR(500) NULL
+);
+
+-- 2. Bảng Products
+CREATE TABLE Products (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Name NVARCHAR(200) NOT NULL,
+    Description NVARCHAR(MAX) NULL,
+    ImageUrl VARCHAR(500) NULL,
+    Price DECIMAL(18,2) NOT NULL,
+    StockQuantity INT NOT NULL DEFAULT 0,
+    CategoryId INT NOT NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    CONSTRAINT FK_Products_Categories FOREIGN KEY (CategoryId) REFERENCES Categories(Id)
+);
+
+-- 3. Bảng Users
+CREATE TABLE Users (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    FullName NVARCHAR(100) NOT NULL,
+    Email VARCHAR(150) NOT NULL UNIQUE,
+    PasswordHash VARCHAR(MAX) NOT NULL,
+    Role VARCHAR(20) NOT NULL DEFAULT 'Customer',
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+);
+
+-- 4. Bảng RefreshTokens
+CREATE TABLE RefreshTokens (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT NOT NULL,
+    Token VARCHAR(MAX) NOT NULL,
+    ExpiresAt DATETIME2 NOT NULL,
+    IsRevoked BIT NOT NULL DEFAULT 0,
+    CONSTRAINT FK_RefreshTokens_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- 5. Bảng Carts & CartItems
+CREATE TABLE Carts (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT NOT NULL UNIQUE,
+    CONSTRAINT FK_Carts_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+CREATE TABLE CartItems (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    CartId INT NOT NULL,
+    ProductId INT NOT NULL,
+    Quantity INT NOT NULL DEFAULT 1,
+    CONSTRAINT FK_CartItems_Carts FOREIGN KEY (CartId) REFERENCES Carts(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_CartItems_Products FOREIGN KEY (ProductId) REFERENCES Products(Id),
+    CONSTRAINT UQ_Cart_Product UNIQUE (CartId, ProductId)
+);
+
+-- 6. Bảng Orders & OrderItems
+CREATE TABLE Orders (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT NOT NULL,
+    ShippingAddress NVARCHAR(500) NOT NULL,
+    PhoneNumber VARCHAR(20) NOT NULL,
+    TotalAmount DECIMAL(18,2) NOT NULL,
+    Status VARCHAR(30) NOT NULL DEFAULT 'Pending',
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT FK_Orders_Users FOREIGN KEY (UserId) REFERENCES Users(Id)
+);
+
+CREATE TABLE OrderItems (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    OrderId INT NOT NULL,
+    ProductId INT NOT NULL,
+    Quantity INT NOT NULL,
+    PriceAtPurchase DECIMAL(18,2) NOT NULL,
+    CONSTRAINT FK_OrderItems_Orders FOREIGN KEY (OrderId) REFERENCES Orders(Id) ON DELETE CASCADE,
+    CONSTRAINT FK_OrderItems_Products FOREIGN KEY (ProductId) REFERENCES Products(Id)
+);
+GO
+
+-- =============================================================
+-- BƯỚC 2: THÊM DỮ LIỆU MẪU (SEED DATA)
+-- =============================================================
+
+-- 1. Thêm Categories (Sẽ nhận Id = 1, 2, 3)
+INSERT INTO Categories (Name, Description) VALUES 
+(N'Điện thoại thông minh', N'Các dòng smartphone cao cấp từ Apple, Samsung, Xiaomi...'),
+(N'Laptop & Máy tính bảng', N'Máy tính xách tay phục vụ học tập, làm việc và đồ họa'),
+(N'Phụ kiện công nghệ', N'Tai nghe, củ sạc, cáp sạc và phụ kiện chính hãng');
+
+-- 2. Thêm Products (Sẽ nhận Id = 1, 2, 3, 4)
+INSERT INTO Products (Name, Description, ImageUrl, Price, StockQuantity, CategoryId, IsActive) VALUES 
+(N'iPhone 15 Pro Max 256GB', N'Màn hình 6.7 inch Super Retina XDR, Chip A17 Pro siêu mạnh mẽ', 'https://picsum.photos/400/400?random=1', 29990000.00, 50, 1, 1),
+(N'MacBook Air M2 8GB 256GB', N'Thiết kế mỏng nhẹ, pin 18 tiếng, màn hình Liquid Retina sắc nét', 'https://picsum.photos/400/400?random=2', 24500000.00, 30, 2, 1),
+(N'Tai nghe Bluetooth AirPods Pro 2', N'Chống ồn chủ động ANC thế hệ mới, âm thanh không gian đỉnh cao', 'https://picsum.photos/400/400?random=3', 5990000.00, 100, 3, 1),
+(N'Củ sạc nhanh Anker 65W GaN', N'Sạc nhanh cho cả Laptop và Điện thoại, thiết kế nhỏ gọn', 'https://picsum.photos/400/400?random=4', 890000.00, 200, 3, 1);
+
+-- 3. Thêm Users (Sẽ nhận Id = 1: Admin, 2: Nguyễn Văn A, 3: Trần Thị B)
+INSERT INTO Users (FullName, Email, PasswordHash, Role, CreatedAt) VALUES 
+(N'Quản trị viên Hệ thống', 'admin@cleanstore.com', '$2a$11$e8Z4Wj8.KxWp5vN2m1L5UeX7J.Hq5G4F3E2D1C0B9A8F7E6D5C4B3A', 'Admin', GETUTCDATE()),
+(N'Nguyễn Văn A', 'nguyenvana@gmail.com', '$2a$11$e8Z4Wj8.KxWp5vN2m1L5UeX7J.Hq5G4F3E2D1C0B9A8F7E6D5C4B3A', 'Customer', GETUTCDATE()),
+(N'Trần Thị B', 'tranthib@gmail.com', '$2a$11$e8Z4Wj8.KxWp5vN2m1L5UeX7J.Hq5G4F3E2D1C0B9A8F7E6D5C4B3A', 'Customer', GETUTCDATE());
+
+-- 4. Thêm RefreshTokens (UserId = 2: Nguyễn Văn A)
+INSERT INTO RefreshTokens (UserId, Token, ExpiresAt, IsRevoked) VALUES 
+(2, 'sample_refresh_token_xyz123890_abc', DATEADD(DAY, 7, GETUTCDATE()), 0);
+
+-- 5. Thêm Carts & CartItems (UserId = 3: Trần Thị B có CartId = 1)
+INSERT INTO Carts (UserId) VALUES (3);
+
+INSERT INTO CartItems (CartId, ProductId, Quantity) VALUES 
+(1, 3, 1), -- Thêm 1 AirPods Pro 2 (ProductId = 3)
+(1, 4, 2); -- Thêm 2 Củ sạc Anker (ProductId = 4)
+
+-- 6. Thêm Orders & OrderItems (UserId = 2: Nguyễn Văn A mua OrderId = 1)
+INSERT INTO Orders (UserId, ShippingAddress, PhoneNumber, TotalAmount, Status, CreatedAt) VALUES 
+(2, N'123 Đường Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh', '0901234567', 35980000.00, 'Paid', GETUTCDATE());
+
+INSERT INTO OrderItems (OrderId, ProductId, Quantity, PriceAtPurchase) VALUES 
+(1, 1, 1, 29990000.00), -- 1x iPhone 15 Pro Max
+(1, 3, 1, 5990000.00);  -- 1x AirPods Pro 2
+
+GO
+select * from Users
